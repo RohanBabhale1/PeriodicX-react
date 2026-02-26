@@ -6,7 +6,7 @@ const initialFilters = {
   periods: [],
   groups: [],
   states: [],
-  radioactive: null, // null = any, true = radioactive only, false = stable only
+  radioactive: null, 
 };
 
 function filtersReducer(state, action) {

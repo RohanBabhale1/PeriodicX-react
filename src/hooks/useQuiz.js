@@ -16,10 +16,25 @@ function shuffle(arr) {
   return a;
 }
 
+// Deduplicated options builder — guarantees no repeated values in the 4 choices
+function buildOptions(correct, wrongPool, count = 3) {
+  const seen = new Set([String(correct)]);
+  const uniqueWrongs = [];
+  for (const w of wrongPool) {
+    const key = String(w);
+    if (!seen.has(key)) {
+      seen.add(key);
+      uniqueWrongs.push(w);
+      if (uniqueWrongs.length === count) break;
+    }
+  }
+  return shuffle([correct, ...uniqueWrongs]);
+}
+
 function generateQuestion(element, allElements, mode) {
   const wrong = shuffle(
     allElements.filter((e) => e.atomicNumber !== element.atomicNumber),
-  ).slice(0, 3);
+  );
 
   switch (mode) {
     case QUIZ_MODES.SYMBOL_TO_NAME:
@@ -31,7 +46,7 @@ function generateQuestion(element, allElements, mode) {
         promptLabel: "What element has this symbol?",
         hint: `Atomic number: ${element.atomicNumber}`,
         correct: element.name,
-        options: shuffle([element.name, ...wrong.map((e) => e.name)]),
+        options: buildOptions(element.name, wrong.map((e) => e.name)),
         element,
       };
 
@@ -44,7 +59,7 @@ function generateQuestion(element, allElements, mode) {
         promptLabel: "What is the chemical symbol?",
         hint: `Period ${element.period}, Group ${element.group ?? "f-block"}`,
         correct: element.symbol,
-        options: shuffle([element.symbol, ...wrong.map((e) => e.symbol)]),
+        options: buildOptions(element.symbol, wrong.map((e) => e.symbol)),
         element,
       };
 
@@ -57,23 +72,18 @@ function generateQuestion(element, allElements, mode) {
         promptLabel: "What category is this element?",
         hint: `Period ${element.period}, Block ${element.block?.toUpperCase()}`,
         correct: element.category,
-        options: shuffle([
-          element.category,
-          ...shuffle([
-            "alkali-metal",
-            "alkaline-earth-metal",
-            "transition-metal",
-            "nonmetal",
-            "noble-gas",
-            "lanthanide",
-            "actinide",
-            "halogen",
-            "metalloid",
-            "post-transition-metal",
-          ])
-            .filter((c) => c !== element.category)
-            .slice(0, 3),
-        ]),
+        options: buildOptions(element.category, shuffle([
+          "alkali-metal",
+          "alkaline-earth-metal",
+          "transition-metal",
+          "nonmetal",
+          "noble-gas",
+          "lanthanide",
+          "actinide",
+          "halogen",
+          "metalloid",
+          "post-transition-metal",
+        ]).filter((c) => c !== element.category)),
         formatOption: (v) =>
           v.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
         element,
@@ -95,7 +105,13 @@ function generateQuestion(element, allElements, mode) {
         {
           label: "period",
           value: String(element.period),
-          wrongs: wrong.map((e) => String(e.period)),
+          wrongs: (() => {
+            const fromElements = wrong.map((e) => String(e.period));
+            const staticPool = ["1","2","3","4","5","6","7"].filter(
+              (p) => p !== String(element.period)
+            );
+            return [...new Set([...fromElements, ...staticPool])];
+          })(),
         },
       ];
       const prop = propList[Math.floor(Math.random() * propList.length)];
@@ -107,7 +123,7 @@ function generateQuestion(element, allElements, mode) {
         promptLabel: `What is the ${prop.label} of ${element.name}?`,
         hint: `Symbol: ${element.symbol}`,
         correct: prop.value,
-        options: shuffle([prop.value, ...prop.wrongs]),
+        options: buildOptions(prop.value, prop.wrongs),
         element,
       };
     }
@@ -124,7 +140,8 @@ const initialState = {
   answers: [],
   phase: "idle",
   mode: QUIZ_MODES.SYMBOL_TO_NAME,
-  totalQuestions: 10,
+  // FIX: null = not chosen yet; user must explicitly pick a number
+  totalQuestions: null,
 };
 
 function quizReducer(state, action) {
@@ -171,7 +188,8 @@ function useQuiz(elements) {
   const [state, dispatch] = useReducer(quizReducer, initialState);
 
   const start = useCallback(
-    (mode, total = 10) => {
+    (mode, total) => {
+      if (!total) return; // guard: require explicit count
       const pool = shuffle(elements).slice(0, total);
       const questions = pool.map((el) => generateQuestion(el, elements, mode));
       dispatch({ type: "START", mode, total, questions });
