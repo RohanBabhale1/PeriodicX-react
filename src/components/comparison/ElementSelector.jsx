@@ -3,21 +3,26 @@ import { useElements } from '../../context/ElementContext';
 import { getCategoryConfig } from '../../config/categoryColors';
 import useDebounce from '../../hooks/useDebounce';
 
-const ElementSelector = memo(function ElementSelector({ slot, selectedElement, onSelect }) {
+const ElementSelector = memo(function ElementSelector({ slot, selectedElement, onSelect, excludeElement }) {
   const { elements } = useElements();
   const [query, setQuery] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const debouncedQuery = useDebounce(query, 200);
 
   const filtered = useMemo(() => {
-    if (!debouncedQuery.trim()) return elements.slice(0, 118);
+    // Filter out the element already selected in the other slot
+    const available = excludeElement
+      ? elements.filter(el => el.atomicNumber !== excludeElement.atomicNumber)
+      : elements;
+
+    if (!debouncedQuery.trim()) return available.slice(0, 118);
     const q = debouncedQuery.toLowerCase();
-    return elements.filter((el) =>
+    return available.filter((el) =>
       el.name.toLowerCase().includes(q) ||
       el.symbol.toLowerCase() === q ||
       String(el.atomicNumber) === q
     ).slice(0, 30);
-  }, [elements, debouncedQuery]);
+  }, [elements, debouncedQuery, excludeElement]);
 
   const handleSelect = useCallback((el) => { onSelect(slot, el); setQuery(''); setIsOpen(false); }, [slot, onSelect]);
   const handleClear  = useCallback(() => { onSelect(slot, null); setQuery(''); }, [slot, onSelect]);

@@ -26,11 +26,13 @@ export default function ComparePage() {
 
         <div className="compare-selectors">
           <Suspense fallback={<div style={{ height: 120, background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-lg)' }} />}>
-            <ElementSelector slot={0} selectedElement={elementA} onSelect={handleSelect} />
+            {/* excludeElement = elementB so slot A can't pick what's already in slot B */}
+            <ElementSelector slot={0} selectedElement={elementA} onSelect={handleSelect} excludeElement={elementB} />
           </Suspense>
           <div className="compare-vs" aria-hidden="true">VS</div>
           <Suspense fallback={<div style={{ height: 120, background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-lg)' }} />}>
-            <ElementSelector slot={1} selectedElement={elementB} onSelect={handleSelect} />
+            {/* excludeElement = elementA so slot B can't pick what's already in slot A */}
+            <ElementSelector slot={1} selectedElement={elementB} onSelect={handleSelect} excludeElement={elementA} />
           </Suspense>
         </div>
 

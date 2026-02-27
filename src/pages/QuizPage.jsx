@@ -4,29 +4,51 @@ import useQuiz, { QUIZ_MODES } from "../hooks/useQuiz";
 
 const QuizCard = lazy(() => import("../components/quiz/QuizCard"));
 
-// How long the feedback banner stays visible before auto-advancing (ms)
+// How long the feedback banner stays before auto-advancing
 const AUTO_ADVANCE_DELAY = 1300;
 
 const MODE_CONFIG = {
+  // ── Original modes ──────────────────────────────────────────────────────
   [QUIZ_MODES.SYMBOL_TO_NAME]: {
     label: "Symbol → Name",
-    icon: "⚛",
-    desc: "Given the symbol, name the element",
+    icon:  "⚛",
+    desc:  "Given the symbol, name the element",
   },
   [QUIZ_MODES.NAME_TO_SYMBOL]: {
     label: "Name → Symbol",
-    icon: "🔤",
-    desc: "Given the name, find its symbol",
+    icon:  "🔤",
+    desc:  "Given the name, find its symbol",
   },
   [QUIZ_MODES.CATEGORY]: {
     label: "Category",
-    icon: "🏷",
-    desc: "Identify the element category",
+    icon:  "🏷",
+    desc:  "Identify the element's category",
   },
   [QUIZ_MODES.PROPERTY]: {
     label: "Properties",
-    icon: "📊",
-    desc: "Guess atomic number, mass or period",
+    icon:  "📊",
+    desc:  "Guess atomic number, mass, period, state and more",
+  },
+  // ── New realistic modes ─────────────────────────────────────────────────
+  [QUIZ_MODES.PROPERTY_TO_ELEMENT]: {
+    label: "Value → Element",
+    icon:  "🔢",
+    desc:  "Given a property value (density, electronegativity…), identify the element",
+  },
+  [QUIZ_MODES.CLUE_BASED]: {
+    label: "Element Riddle",
+    icon:  "🔍",
+    desc:  "Read 3 factual clues and figure out which element is described",
+  },
+  [QUIZ_MODES.TREND_COMPARISON]: {
+    label: "Periodic Trends",
+    icon:  "📈",
+    desc:  "Pick which element has the highest or lowest value for a given property",
+  },
+  [QUIZ_MODES.MULTI_SELECT]: {
+    label: "Select All",
+    icon:  "☑",
+    desc:  "Select ALL elements from a list that satisfy a given condition",
   },
 };
 
@@ -34,7 +56,7 @@ const TOTAL_OPTIONS = [5, 10, 15, 20];
 
 function ScoreRing({ percentage }) {
   const r = 36, circumference = 2 * Math.PI * r;
-  const dash = (percentage / 100) * circumference;
+  const dash  = (percentage / 100) * circumference;
   const color = percentage >= 80 ? "#22c55e" : percentage >= 50 ? "#eab308" : "#ef4444";
   return (
     <svg width="104" height="104" viewBox="0 0 104 104" aria-label={`Score: ${percentage}%`}>
@@ -48,44 +70,68 @@ function ScoreRing({ percentage }) {
   );
 }
 
+// ── Review row helpers ────────────────────────────────────────────────────────
+function formatReviewPrompt(question) {
+  if (question.multiSelect)           return `Select all: ${question.correctAnswers?.join(', ')}`;
+  if (question.promptType === 'clue') return `${question.element.name} (riddle)`;
+  if (question.promptType === 'trend' || question.promptType === 'property')
+                                      return question.prompt.length > 40
+                                        ? question.prompt.slice(0, 40) + '…'
+                                        : question.prompt;
+  return question.prompt;
+}
+
+function formatReviewCorrect(question) {
+  if (question.multiSelect)  return question.correctAnswers?.join(', ') ?? question.correct;
+  if (question.formatOption) return question.formatOption(question.correct);
+  return question.correct;
+}
+
+function formatReviewYours(answer, question) {
+  if (question.multiSelect)  return answer.split('|').join(', ');
+  if (question.formatOption) return question.formatOption(answer);
+  return answer;
+}
+
 export default function QuizPage() {
   const { elements } = useElements();
   const quiz = useQuiz(elements);
 
-  // FIX: mode cards are disabled until user explicitly picks a question count
   const handleStart = useCallback(
-    (mode) => {
-      if (!quiz.totalQuestions) return;
-      quiz.start(mode, quiz.totalQuestions);
-    },
+    (mode) => { if (quiz.totalQuestions) quiz.start(mode, quiz.totalQuestions); },
     [quiz],
   );
 
-  // FIX: auto-advance — after selecting an answer wait AUTO_ADVANCE_DELAY ms
-  // then move forward automatically. "Next Question" button is removed entirely.
+  // Auto-advance after answer — works for both single and multi-select
+  // (multi-select sets quiz.selected when submitted, same signal)
   const autoAdvanceTimer = useRef(null);
   useEffect(() => {
     if (quiz.selected !== null) {
-      autoAdvanceTimer.current = setTimeout(() => {
-        quiz.next();
-      }, AUTO_ADVANCE_DELAY);
+      autoAdvanceTimer.current = setTimeout(() => quiz.next(), AUTO_ADVANCE_DELAY);
     }
     return () => clearTimeout(autoAdvanceTimer.current);
-  // Re-run both when selected changes AND when currentIndex changes (new question)
   }, [quiz.selected, quiz.currentIndex]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Build feedback object for QuizCard inline banner
+  // Build feedback for current question
   const q = quiz.phase === "playing" ? quiz.currentQuestion : null;
   const feedback = q && quiz.selected
-    ? {
-        type: quiz.selected === q.correct ? "correct" : "wrong",
-        message: quiz.selected === q.correct
-          ? `Correct!  ${q.element.name} (${q.element.symbol})`
-          : `Answer: ${q.formatOption ? q.formatOption(q.correct) : q.correct}`,
-      }
+    ? (() => {
+        const isCorrect = quiz.selected === q.correct;
+        let message;
+        if (q.multiSelect) {
+          message = isCorrect
+            ? `Correct! All ${q.correctAnswers?.length} answers selected`
+            : `Answer: ${q.correctAnswers?.join(', ')}`;
+        } else {
+          message = isCorrect
+            ? `Correct! ${q.element.name} (${q.element.symbol})`
+            : `Answer: ${q.formatOption ? q.formatOption(q.correct) : q.correct}`;
+        }
+        return { type: isCorrect ? "correct" : "wrong", message };
+      })()
     : null;
 
-  // ── IDLE ──────────────────────────────────────────────────
+  // ── IDLE ──────────────────────────────────────────────────────────────────
   if (quiz.phase === "idle") {
     return (
       <main className="quiz-page" role="main">
@@ -97,7 +143,6 @@ export default function QuizPage() {
             <p className="quiz-subtitle">Test your chemistry knowledge across all 118 elements</p>
           </div>
 
-          {/* FIX: no default selected; user must actively choose a count */}
           <div className="quiz-setup">
             <span className="quiz-setup__label">How many questions?</span>
             <div className="quiz-setup__options">
@@ -138,7 +183,7 @@ export default function QuizPage() {
     );
   }
 
-  // ── RESULT ────────────────────────────────────────────────
+  // ── RESULT ────────────────────────────────────────────────────────────────
   if (quiz.phase === "result") {
     const grade =
       quiz.percentage >= 90 ? { label: "Excellent!", emoji: "🏆", color: "#22c55e" }
@@ -156,9 +201,9 @@ export default function QuizPage() {
             <ScoreRing percentage={quiz.percentage} />
             <div className="result-stats">
               {[
-                { label: "Correct",     value: quiz.score,                          color: "#22c55e" },
-                { label: "Wrong",       value: quiz.questions.length - quiz.score,  color: "#ef4444" },
-                { label: "Best Streak", value: `🔥 ${quiz.bestStreak}`,             color: "#f97316" },
+                { label: "Correct",     value: quiz.score,                         color: "#22c55e" },
+                { label: "Wrong",       value: quiz.questions.length - quiz.score, color: "#ef4444" },
+                { label: "Best Streak", value: `🔥 ${quiz.bestStreak}`,            color: "#f97316" },
               ].map((s) => (
                 <div key={s.label} className="result-stat">
                   <span className="result-stat__value" style={{ color: s.color }}>{s.value}</span>
@@ -172,13 +217,11 @@ export default function QuizPage() {
                 {quiz.answers.map((a, i) => (
                   <div key={i} className={`review-row review-row--${a.correct ? "ok" : "bad"}`}>
                     <span className="review-row__icon">{a.correct ? "✓" : "✕"}</span>
-                    <span className="review-row__q">{a.question.prompt}</span>
-                    <span className="review-row__answer">
-                      {a.question.formatOption ? a.question.formatOption(a.question.correct) : a.question.correct}
-                    </span>
+                    <span className="review-row__q">{formatReviewPrompt(a.question)}</span>
+                    <span className="review-row__answer">{formatReviewCorrect(a.question)}</span>
                     {!a.correct && (
                       <span className="review-row__yours">
-                        (you: {a.question.formatOption ? a.question.formatOption(a.answer) : a.answer})
+                        (you: {formatReviewYours(a.answer, a.question)})
                       </span>
                     )}
                   </div>
@@ -201,7 +244,7 @@ export default function QuizPage() {
     );
   }
 
-  // ── PLAYING ───────────────────────────────────────────────
+  // ── PLAYING ───────────────────────────────────────────────────────────────
   if (!q) return null;
   return (
     <main className="quiz-page" role="main">
@@ -223,11 +266,13 @@ export default function QuizPage() {
         </div>
 
         <Suspense fallback={null}>
-          {/* "Next Question" button is gone — auto-advance handles progression */}
           <QuizCard
             question={q}
             selected={quiz.selected}
+            multiSelected={quiz.multiSelected}
             onSelect={quiz.select}
+            onToggleMulti={quiz.toggleMulti}
+            onSubmitMulti={quiz.submitMulti}
             streak={quiz.streak}
             feedback={feedback}
           />
@@ -274,6 +319,7 @@ function QuizCSS() {
     .quiz-progress-fill { height:100%; background:linear-gradient(90deg,#3b82f6,#8b5cf6); border-radius:3px; transition:width 400ms ease; }
     .quiz-progress-label { font-family:var(--font-mono); font-size:0.65rem; color:var(--text-muted); }
     .quiz-score-row { display:flex; gap:10px; font-family:var(--font-display); font-size:0.85rem; font-weight:700; color:var(--text-secondary); flex-shrink:0; }
+    .quiz-streak-mini { color:#f97316; }
     .result-card { display:flex; flex-direction:column; align-items:center; gap:20px; background:var(--bg-secondary); border:1px solid var(--border-medium); border-radius:var(--radius-xl); padding:32px; }
     .result-top { display:flex; flex-direction:column; align-items:center; gap:8px; }
     .result-emoji { font-size:2.8rem; animation:float 2s ease-in-out infinite; display:block; }
@@ -291,7 +337,7 @@ function QuizCSS() {
     .review-row__icon { font-weight:700; font-size:0.7rem; flex-shrink:0; }
     .review-row--ok  .review-row__icon { color:#22c55e; }
     .review-row--bad .review-row__icon { color:#ef4444; }
-    .review-row__q { font-family:var(--font-mono); color:var(--text-muted); font-size:0.72rem; flex-shrink:0; }
+    .review-row__q { font-family:var(--font-mono); color:var(--text-muted); font-size:0.72rem; flex-shrink:0; max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .review-row__answer { font-weight:600; color:var(--text-primary); flex:1; }
     .review-row__yours  { font-size:0.68rem; color:#ef4444; flex-shrink:0; }
     .result-actions { display:flex; gap:10px; }
