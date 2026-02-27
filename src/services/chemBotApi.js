@@ -1,4 +1,3 @@
-import Groq from 'groq-sdk';
 import { CHAT_CONFIG, SESSION_ID } from '../config/chatConfig.js';
 import elementsData from '../data/elements.json';
 
@@ -132,10 +131,14 @@ function parseGroqRateLimit(err) {
   };
 }
 
+// ── Dev mode: calls Groq directly from browser ────────────────────────────────
 async function sendMessageDev(message, history = []) {
   if (!DEV_API_KEY) throw new Error('VITE_GROQ_API_KEY not set in .env.local');
 
+  // Dynamic import so groq-sdk is never bundled into the production build
+  const { default: Groq } = await import('groq-sdk');
   const groq = new Groq({ apiKey: DEV_API_KEY, dangerouslyAllowBrowser: true });
+
   const systemPrompt = buildSystemPrompt(formatElementData(resolveRelevantElements(message)));
   const recentHistory = (Array.isArray(history) ? history : [])
     .slice(-CHAT_CONFIG.maxHistory)
@@ -167,7 +170,7 @@ async function sendMessageDev(message, history = []) {
   }
 }
 
-
+// ── Prod mode: calls your Vercel serverless function ─────────────────────────
 async function sendMessageProd(message, history = []) {
   const res = await fetch(CHAT_CONFIG.apiUrl, {
     method:  'POST',
@@ -184,7 +187,6 @@ async function sendMessageProd(message, history = []) {
   catch { throw Object.assign(new Error('Invalid server response.'), { code:'PARSE_ERROR' }); }
 
   if (!res.ok) {
-
     const err     = new Error(data.error ?? `Server error ${res.status}`);
     err.code      = data.code      ?? 'SERVER_ERROR';
     err.rateLimit = data.rateLimit ?? null;
@@ -195,6 +197,7 @@ async function sendMessageProd(message, history = []) {
   return { reply: data.reply, meta: data.meta ?? null };
 }
 
+// ── Public API ────────────────────────────────────────────────────────────────
 export async function sendMessage(message, history = []) {
   return IS_DEV ? sendMessageDev(message, history) : sendMessageProd(message, history);
 }

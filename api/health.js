@@ -14,7 +14,7 @@ export default function handler(req, res) {
     status: apiKeyOk ? 'operational' : 'missing_api_key',
     model:  'llama-3.3-70b-versatile',
     limits: {
-      dailyTokenQuota:   500_000,
+      dailyTokenQuota:   100_000,
       maxConcurrentUsers: 5,
       userRpm:            6,
       cooldownMs:         3_000,
