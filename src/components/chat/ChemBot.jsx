@@ -9,34 +9,7 @@ const WELCOME =
   "elements, properties, trends, or comparisons!\n\n" +
   "I only answer chemistry questions. Try one of the suggestions below to get started.";
 
-const DAILY_CAP          = 20_000;   // per-user visual quota for the token bar
-const AVG_TOKENS_PER_MSG = 400;
-const LS_KEY             = 'chembot_daily_quota';
-
-// ── localStorage daily quota helpers ─────────────────────────────────────────
-function loadDailyQuota() {
-  try {
-    const raw   = localStorage.getItem(LS_KEY);
-    const today = new Date().toDateString();
-    if (!raw) return { date: today, used: 0 };
-    const parsed = JSON.parse(raw);
-    if (parsed.date !== today) return { date: today, used: 0 };
-    return parsed;
-  } catch {
-    return { date: new Date().toDateString(), used: 0 };
-  }
-}
-
-function saveDailyQuota(used) {
-  try {
-    localStorage.setItem(LS_KEY, JSON.stringify({
-      date: new Date().toDateString(),
-      used,
-    }));
-  } catch { /* localStorage unavailable — fail silently */ }
-}
-
-// ── Live midnight countdown ───────────────────────────────────────────────────
+// ── Live midnight countdown (used in RateLimitCard & exhausted message) ───────
 function useMidnightCountdown() {
   const [timeLeft, setTimeLeft] = useState('');
   useEffect(() => {
@@ -104,58 +77,17 @@ const RateLimitCard = memo(function RateLimitCard({ rateLimit, timeLeft }) {
   );
 });
 
-// ── Session token bar ─────────────────────────────────────────────────────────
-const TokenBar = memo(function TokenBar({ used, cap, timeLeft, usingFallback }) {
-  if (used === 0) return null;
-  const remaining = Math.max(0, cap - used);
-  const pct       = Math.min(100, Math.round((used / cap) * 100));
-  const msgsLeft  = Math.max(0, Math.floor(remaining / AVG_TOKENS_PER_MSG));
-  const color     = pct >= 100 ? '#f59e0b' : pct >= 80 ? '#ef4444' : pct >= 50 ? '#f59e0b' : '#22c55e';
-
-  return (
-    <div className="cb-token-bar-wrap">
-      {usingFallback && (
-        <div className="cb-token-warn" style={{ color: '#f59e0b' }}>
-          ⚡ Groq limit reached · using backup AI
-        </div>
-      )}
-      {!usingFallback && pct >= 80 && (
-        <div className="cb-token-warn">
-          ⚠️ ~{msgsLeft} message{msgsLeft !== 1 ? 's' : ''} left · resets in <strong>{timeLeft}</strong>
-        </div>
-      )}
-      <div className="cb-token-row">
-        <span className="cb-token-used">{used.toLocaleString()} used</span>
-        <div className="cb-token-track">
-          <div className="cb-token-fill" style={{ width:`${pct}%`, background:color }} />
-        </div>
-        <span className="cb-token-rem" style={{ color }}>
-          {usingFallback ? 'backup' : `${remaining.toLocaleString()} left`}
-        </span>
-      </div>
-    </div>
-  );
-});
-
 // ── Main component ────────────────────────────────────────────────────────────
 const ChemBot = memo(function ChemBot({ onClose }) {
-  const [messages,      setMessages]      = useState([{ role:'assistant', text:WELCOME, id:0 }]);
-  const [input,         setInput]         = useState('');
-  const [loading,       setLoading]       = useState(false);
-  const [online,        setOnline]        = useState(true);
-  const [allExhausted,  setAllExhausted]  = useState(false); // true only when ALL providers fail
-  const [usingFallback, setUsingFallback] = useState(false); // true when Mistral is active
+  const [messages,     setMessages]     = useState([{ role:'assistant', text:WELCOME, id:0 }]);
+  const [input,        setInput]        = useState('');
+  const [loading,      setLoading]      = useState(false);
+  const [online,       setOnline]       = useState(true);
+  const [allExhausted, setAllExhausted] = useState(false); // true only when ALL providers fail
 
-  // ── Quota: initialise from localStorage so it persists across page refreshes ──
-  const [quota, setQuota] = useState(() => {
-    const daily = loadDailyQuota();
-    return { used: daily.used, cap: DAILY_CAP };
-  });
-
-  const bottomRef      = useRef(null);
-  const inputRef       = useRef(null);
-  const prevSessionRef = useRef(0);
-  const timeLeft       = useMidnightCountdown();
+  const bottomRef = useRef(null);
+  const inputRef  = useRef(null);
+  const timeLeft  = useMidnightCountdown();
 
   useEffect(() => { checkHealth().then(ok => setOnline(ok)); }, []);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior:'smooth' }); }, [messages]);
@@ -179,32 +111,15 @@ const ChemBot = memo(function ChemBot({ onClose }) {
     setInput('');
     setLoading(true);
 
-    const currentDaily = loadDailyQuota();
     const history = messages
       .filter(m => m.id !== 0)
       .slice(-CHAT_CONFIG.maxHistory)
       .map(m => ({ role: m.role, content: m.text }));
 
     try {
-      const { reply, meta, provider } = await sendMessage(t, history);
+      const { reply } = await sendMessage(t, history);
       addMessage('assistant', reply);
       setOnline(true);
-
-      // Track which provider responded
-      if (provider === 'mistral') {
-        setUsingFallback(true);
-      } else if (provider === 'groq') {
-        setUsingFallback(false);
-      }
-
-      // ── Update daily quota display ────────────────────────────────────────
-      if (meta?.sessionTokensUsed != null) {
-        const tokensThisMsg = Math.max(0, meta.sessionTokensUsed - prevSessionRef.current);
-        prevSessionRef.current = meta.sessionTokensUsed;
-        const newDailyUsed = Math.min(DAILY_CAP, currentDaily.used + tokensThisMsg);
-        saveDailyQuota(newDailyUsed);
-        setQuota({ used: newDailyUsed, cap: DAILY_CAP });
-      }
 
     } catch (err) {
       setOnline(false);
@@ -224,8 +139,8 @@ const ChemBot = memo(function ChemBot({ onClose }) {
 
       // Cooldown / RPM limits → friendly text, don't lock UI
       const msg =
-          err.code === 'COOLDOWN'        ? 'Please wait a moment before sending again.'
-        : err.code === 'USER_RATE_LIMIT' ? 'Too many messages. Please slow down.'
+          err.code === 'COOLDOWN'         ? 'Please wait a moment before sending again.'
+        : err.code === 'USER_RATE_LIMIT'  ? 'Too many messages. Please slow down.'
         : err.code === 'GLOBAL_RATE_LIMIT'? 'Server is busy. Try again in a few seconds.'
         : 'Something went wrong. Please try again.';
 
@@ -240,7 +155,6 @@ const ChemBot = memo(function ChemBot({ onClose }) {
   }, [handleSend]);
 
   const showSuggestions = messages.length <= 2;
-  // Only disable UI when truly all providers are gone
   const inputDisabled   = loading || allExhausted;
 
   return (
@@ -260,9 +174,6 @@ const ChemBot = memo(function ChemBot({ onClose }) {
         </div>
         {onClose && <button className="cb-close" onClick={onClose} aria-label="Close ChemBot">✕</button>}
       </div>
-
-      {/* Token bar */}
-      <TokenBar used={quota.used} cap={quota.cap} timeLeft={timeLeft} usingFallback={usingFallback} />
 
       {/* Messages */}
       <div className="cb-messages" role="log" aria-live="polite">
@@ -302,19 +213,18 @@ const ChemBot = memo(function ChemBot({ onClose }) {
           ref={inputRef}
           type="text"
           className="cb-input"
-          placeholder={allExhausted ? 'All providers unavailable — try later…' : 'Ask about any element or periodic trend…'}
+          placeholder={allExhausted ? 'All providers unavailable…' : 'Ask about any element or periodic trend…'}
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={handleKey}
           disabled={inputDisabled}
-          maxLength={300}
-          aria-label="Your chemistry question"
+          aria-label="Chat input"
         />
         <button
           className="cb-send"
           onClick={() => handleSend()}
-          disabled={!input.trim() || inputDisabled}
-          aria-label="Send"
+          disabled={inputDisabled || !input.trim()}
+          aria-label="Send message"
         >↑</button>
       </div>
 
@@ -330,12 +240,6 @@ const ChemBot = memo(function ChemBot({ onClose }) {
         .cb-dot--on{background:#22c55e}.cb-dot--off{background:#ef4444}
         .cb-close{width:28px;height:28px;border-radius:50%;background:var(--bg-secondary);border:1px solid var(--border-medium);color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:0.75rem;transition:all var(--transition-fast)}
         .cb-close:hover{background:var(--bg-tertiary);color:var(--text-primary)}
-        .cb-token-bar-wrap{padding:6px 14px;background:var(--bg-tertiary);border-bottom:1px solid var(--border-subtle);flex-shrink:0}
-        .cb-token-warn{font-size:0.65rem;color:#f59e0b;margin-bottom:4px}
-        .cb-token-row{display:flex;align-items:center;gap:8px}
-        .cb-token-used,.cb-token-rem{font-size:0.62rem;color:var(--text-muted);white-space:nowrap;font-family:var(--font-mono)}
-        .cb-token-track{flex:1;height:4px;background:var(--border-subtle);border-radius:2px;overflow:hidden}
-        .cb-token-fill{height:100%;border-radius:2px;transition:width 0.4s ease,background 0.4s}
         .cb-messages{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:12px;scroll-behavior:smooth}
         .cb-msg{display:flex;gap:8px;align-items:flex-start}
         .cb-msg--user{flex-direction:row-reverse}
