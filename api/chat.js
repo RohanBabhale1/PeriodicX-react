@@ -359,13 +359,19 @@ export default async function handler(req, res) {
 
   // Internal rate-limit check (before calling any API)
   const limitResult = limiter.check(sessionId);
-  if (limitResult) {
+
+  // COOLDOWN and USER/GLOBAL RPM limits → block immediately, no fallback needed
+  const hardBlock = limitResult && ["COOLDOWN", "USER_RATE_LIMIT", "GLOBAL_RATE_LIMIT"].includes(limitResult.code);
+  if (hardBlock) {
     return res.status(429).json({
       error: limitResult.message,
       code: limitResult.code,
       waitMs: limitResult.waitMs ?? null,
     });
   }
+
+  // DAILY_EXHAUSTED or SESSION_CAP → Groq quota is gone, skip straight to Mistral
+  const groqExhausted = limitResult && ["DAILY_EXHAUSTED", "SESSION_CAP"].includes(limitResult.code);
 
   const maxTokens = limiter.getDynamicMaxTokens();
   const relevantElements = resolveRelevantElements(message.trim());
@@ -384,61 +390,58 @@ export default async function handler(req, res) {
     { role: "user", content: message.trim() },
   ];
 
-  // ── Try Groq first ────────────────────────────────────────────────────────
-  try {
-    const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
-    const completion = await groq.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
-      messages,
-      temperature: 0.1,
-      max_tokens: maxTokens,
-    });
 
-    const reply = completion.choices[0]?.message?.content?.trim() ?? "No response received.";
-    const tokensUsed = completion.usage?.total_tokens ?? 400;
-    limiter.record(sessionId, tokensUsed);
+  // ── Try Groq first (unless internal quota already exhausted) ─────────────
+  if (!groqExhausted) {
+    try {
+      const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+      const completion = await groq.chat.completions.create({
+        model: "llama-3.3-70b-versatile",
+        messages,
+        temperature: 0.1,
+        max_tokens: maxTokens,
+      });
 
-    return res.status(200).json({
-      reply,
-      provider: "groq",
-      meta: limiter.getSessionMeta(sessionId),
-    });
-  } catch (groqErr) {
-    console.error("[ChemBot] Groq error:", groqErr?.status, groqErr?.message);
+      const reply = completion.choices[0]?.message?.content?.trim() ?? "No response received.";
+      const tokensUsed = completion.usage?.total_tokens ?? 400;
+      limiter.record(sessionId, tokensUsed);
 
-    // ── Groq hit a rate limit → silently fall back to Mistral ────────────────
-    if (groqErr?.status === 429) {
-      console.log("[ChemBot] Groq rate-limited — trying Mistral fallback...");
+      return res.status(200).json({
+        reply,
+        provider: "groq",
+        meta: limiter.getSessionMeta(sessionId),
+      });
+    } catch (groqErr) {
+      console.error("[ChemBot] Groq error:", groqErr?.status, groqErr?.message);
 
-      try {
-        const { reply, tokensUsed } = await callMistral(messages, maxTokens);
-        limiter.record(sessionId, tokensUsed);
-
-        return res.status(200).json({
-          reply,
-          provider: "mistral", // lets the UI know (optional)
-          meta: limiter.getSessionMeta(sessionId),
-        });
-      } catch (mistralErr) {
-        console.error("[ChemBot] Mistral fallback also failed:", mistralErr?.message);
-
-        // Both APIs failed — now show the Groq rate-limit card to the user
-        const rateLimit = parseGroqRateLimitError(groqErr);
-        const isDaily = rateLimit.type === "daily";
-        return res.status(429).json({
-          error: isDaily
-            ? "Daily token quota reached on all providers. Please try again tomorrow."
-            : "Both AI providers are temporarily busy. Please try again in a moment.",
-          code: isDaily ? "GROQ_TPD_LIMIT" : "GROQ_TPM_LIMIT",
-          rateLimit,
+      // Non-rate-limit Groq error → fail immediately, no Mistral fallback
+      if (groqErr?.status !== 429) {
+        return res.status(500).json({
+          error: "Something went wrong. Please try again.",
+          code: "SERVER_ERROR",
         });
       }
-    }
 
-    // Non-rate-limit Groq error
-    return res.status(500).json({
-      error: "Something went wrong. Please try again.",
-      code: "SERVER_ERROR",
+      console.log("[ChemBot] Groq rate-limited — trying Mistral fallback...");
+    }
+  } else {
+    console.log("[ChemBot] Internal Groq quota exhausted — skipping to Mistral...");
+  }
+
+  // ── Mistral fallback ─────────────────────────────────────────────────────
+  // Runs when: Groq returned 429 OR internal DAILY_EXHAUSTED/SESSION_CAP hit
+  try {
+    const { reply, tokensUsed } = await callMistral(messages, maxTokens);
+    return res.status(200).json({
+      reply,
+      provider: "mistral",
+      meta: limiter.getSessionMeta(sessionId),
+    });
+  } catch (mistralErr) {
+    console.error("[ChemBot] Mistral fallback failed:", mistralErr?.message);
+    return res.status(429).json({
+      error: "All AI providers are currently unavailable. Please try again later.",
+      code: "ALL_PROVIDERS_EXHAUSTED",
     });
   }
 }
