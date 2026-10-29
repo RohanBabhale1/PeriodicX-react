@@ -1,44 +1,65 @@
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500;600&family=Outfit:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Roboto+Slab:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500;600&display=swap');
 
-/* ─── Design Tokens ──────────────────────────────────────── */
+/* ─── Design Tokens ──────────────────────────────────────────
+   Style source: "The Periodic Table of Elements" (Compound Interest)
+   - bold slab-serif lettering
+   - clean white background, black outlines
+   - s / p / d / f block colour coding (red / blue / orange / green)
+   ─────────────────────────────────────────────────────────── */
 :root {
-  --font-display: 'Syne', sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
-  --font-body: 'Outfit', sans-serif;
+  --font-display: 'Roboto Slab', Rockwell, serif;
+  --font-mono:    'JetBrains Mono', monospace;
+  --font-body:    'Roboto Slab', Rockwell, serif;
 
-  /* Light theme */
-  --bg-primary:    #f0f4f8;
+  /* Block colours (from the "Groups of elements" key) */
+  --block-s: #b5232a;   /* s block – red    */
+  --block-p: #1c8ed1;   /* p block – blue   */
+  --block-d: #ec9a1f;   /* d block – orange */
+  --block-f: #3f9b3c;   /* f block – green  */
+
+  --block-s-soft: rgba(181, 35, 42, 0.10);
+  --block-p-soft: rgba(28, 142, 209, 0.10);
+  --block-d-soft: rgba(236, 154, 31, 0.12);
+  --block-f-soft: rgba(63, 155, 60, 0.10);
+
+  /* Light theme – white poster look */
+  --bg-primary:    #ffffff;
   --bg-secondary:  #ffffff;
-  --bg-tertiary:   #e2e8f0;
-  --bg-card:       rgba(255, 255, 255, 0.8);
-  --bg-card-hover: rgba(255, 255, 255, 0.95);
-  --bg-overlay:    rgba(15, 23, 42, 0.6);
+  --bg-tertiary:   #f1f1f1;
+  --bg-card:       #ffffff;
+  --bg-card-hover: #fafafa;
+  --bg-overlay:    rgba(0, 0, 0, 0.6);
   --bg-modal:      #ffffff;
-  --bg-header:     rgba(240, 244, 248, 0.85);
-  --bg-input:      rgba(226, 232, 240, 0.8);
+  --bg-header:     rgba(255, 255, 255, 0.92);
+  --bg-input:      #f1f1f1;
 
-  --text-primary:   #0f172a;
-  --text-secondary: #475569;
-  --text-muted:     #94a3b8;
-  --text-inverse:   #f8fafc;
+  --text-primary:   #1a1a1a;
+  --text-secondary: #4a4a4a;
+  --text-muted:     #8a8a8a;
+  --text-inverse:   #ffffff;
 
-  --border-subtle: rgba(15, 23, 42, 0.08);
-  --border-medium: rgba(15, 23, 42, 0.15);
-  --border-strong: rgba(15, 23, 42, 0.25);
+  /* Cell / box outlines are solid dark, like the chart */
+  --cell-border:   #1a1a1a;
+  --cell-border-w: 2px;
 
-  --accent:      #3b82f6;
-  --accent-hover:#2563eb;
-  --accent-glow: rgba(59, 130, 246, 0.3);
+  --border-subtle: rgba(0, 0, 0, 0.08);
+  --border-medium: rgba(0, 0, 0, 0.20);
+  --border-strong: rgba(0, 0, 0, 0.55);
 
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.05);
-  --shadow-md: 0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.05);
-  --shadow-lg: 0 10px 30px rgba(0,0,0,0.1), 0 4px 8px rgba(0,0,0,0.06);
-  --shadow-xl: 0 20px 60px rgba(0,0,0,0.15);
+  --accent:       var(--block-p);
+  --accent-hover: #146fa6;
+  --accent-glow:  rgba(28, 142, 209, 0.30);
 
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 16px;
-  --radius-xl: 24px;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.10);
+  --shadow-md: 0 3px 8px rgba(0,0,0,0.12);
+  --shadow-lg: 0 8px 22px rgba(0,0,0,0.16);
+  --shadow-xl: 0 20px 60px rgba(0,0,0,0.25);
+
+  /* Sharper corners – table cells are almost square */
+  --radius-sm: 3px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-xl: 16px;
 
   --transition-fast:   150ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-base:   250ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -47,29 +68,46 @@
 }
 
 [data-theme='dark'] {
-  --bg-primary:    #070b14;
-  --bg-secondary:  #0d1421;
-  --bg-tertiary:   #141e30;
-  --bg-card:       rgba(20, 30, 50, 0.7);
-  --bg-card-hover: rgba(25, 38, 62, 0.9);
-  --bg-overlay:    rgba(0, 0, 0, 0.7);
-  --bg-modal:      #0d1421;
-  --bg-header:     rgba(7, 11, 20, 0.85);
-  --bg-input:      rgba(20, 30, 50, 0.8);
+  --bg-primary:    #121212;
+  --bg-secondary:  #1b1b1b;
+  --bg-tertiary:   #262626;
+  --bg-card:       #1b1b1b;
+  --bg-card-hover: #242424;
+  --bg-overlay:    rgba(0, 0, 0, 0.75);
+  --bg-modal:      #1b1b1b;
+  --bg-header:     rgba(18, 18, 18, 0.92);
+  --bg-input:      #262626;
 
-  --text-primary:   #e2e8f0;
-  --text-secondary: #94a3b8;
-  --text-muted:     #64748b;
-  --text-inverse:   #0f172a;
+  --text-primary:   #f2f2f2;
+  --text-secondary: #b8b8b8;
+  --text-muted:     #7d7d7d;
+  --text-inverse:   #1a1a1a;
 
-  --border-subtle: rgba(255, 255, 255, 0.05);
-  --border-medium: rgba(255, 255, 255, 0.1);
-  --border-strong: rgba(255, 255, 255, 0.2);
+  --cell-border: #f2f2f2;
 
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
-  --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
-  --shadow-lg: 0 10px 30px rgba(0,0,0,0.5);
-  --shadow-xl: 0 20px 60px rgba(0,0,0,0.7);
+  /* Slightly brighter block colours for dark backgrounds */
+  --block-s: #e0434a;
+  --block-p: #3aa6e8;
+  --block-d: #f5ad3c;
+  --block-f: #5bb857;
+
+  --block-s-soft: rgba(224, 67, 74, 0.18);
+  --block-p-soft: rgba(58, 166, 232, 0.18);
+  --block-d-soft: rgba(245, 173, 60, 0.18);
+  --block-f-soft: rgba(91, 184, 87, 0.18);
+
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-medium: rgba(255, 255, 255, 0.18);
+  --border-strong: rgba(255, 255, 255, 0.45);
+
+  --accent:       var(--block-p);
+  --accent-hover: #6bbdf0;
+  --accent-glow:  rgba(58, 166, 232, 0.35);
+
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.4);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.5);
+  --shadow-lg: 0 10px 30px rgba(0,0,0,0.6);
+  --shadow-xl: 0 20px 60px rgba(0,0,0,0.8);
 }
 
 /* ─── Reset ──────────────────────────────────────────────── */
@@ -84,13 +122,16 @@ body {
   -webkit-font-smoothing: antialiased;
   transition: background-color var(--transition-slow), color var(--transition-slow);
 }
+/* Flat white poster background – subtle block-colour tints only in the corners */
 body::before {
   content: '';
   position: fixed;
   inset: 0;
   background:
-    radial-gradient(ellipse 80% 60% at 20% 10%, rgba(59,130,246,0.06) 0%, transparent 60%),
-    radial-gradient(ellipse 60% 40% at 80% 90%, rgba(139,92,246,0.05) 0%, transparent 60%);
+    radial-gradient(ellipse 60% 40% at 0% 0%,   var(--block-s-soft) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 100% 0%, var(--block-p-soft) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 0% 100%, var(--block-d-soft) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 100% 100%, var(--block-f-soft) 0%, transparent 60%);
   pointer-events: none;
   z-index: 0;
 }
@@ -98,6 +139,15 @@ body::before {
 a { color: inherit; text-decoration: none; }
 button { font-family: var(--font-body); cursor: pointer; border: none; background: none; }
 input  { font-family: var(--font-body); }
+
+/* Headings use the bold slab display face, like the chart title */
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  line-height: 1.15;
+  text-transform: uppercase;
+}
 
 /* ─── Scrollbar ──────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -127,3 +177,199 @@ input  { font-family: var(--font-body); }
 .table-scroll-wrapper { overflow-x: auto; overflow-y: visible; padding-bottom: 8px; -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
 .modal-backdrop { position: fixed; inset: 0; background: var(--bg-overlay); backdrop-filter: blur(4px); z-index: 100; display: flex; align-items: center; justify-content: center; padding: 16px; animation: fadeIn 200ms ease both; }
 .badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 999px; font-size: 0.7rem; font-family: var(--font-mono); font-weight: 500; letter-spacing: 0.04em; white-space: nowrap; border: 1px solid; }
+
+/* ─── Periodic Table Layout ──────────────────────────────────
+   18-column grid; place lanthanides/actinides in a second grid
+   below with a gap (as in the chart).
+   ─────────────────────────────────────────────────────────── */
+.pt-grid {
+  display: grid;
+  grid-template-columns: repeat(18, minmax(52px, 1fr));
+  gap: 4px;
+  min-width: 1000px;
+}
+.pt-grid--f-block {
+  margin-top: 28px;
+  /* offset so the f-block row lines up under groups 3–16 */
+  grid-template-columns: repeat(18, minmax(52px, 1fr));
+}
+
+/* ─── Element Cell ───────────────────────────────────────────
+   Usage: <button class="element-cell block-s">
+            <span class="element-number">1</span>
+            <span class="element-symbol">H</span>
+            <span class="element-name">Hydrogen</span>
+            <span class="element-mass">1.008</span>
+          </button>
+   ─────────────────────────────────────────────────────────── */
+.element-cell {
+  --block-color: var(--text-muted);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1 / 1.05;
+  padding: 14px 3px 4px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: var(--cell-border-w) solid var(--cell-border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-display);
+  text-align: center;
+  overflow: hidden;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), background-color var(--transition-fast);
+}
+/* Coloured block marker in the top-right corner */
+.element-cell::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 9px;
+  height: 9px;
+  background: var(--block-color);
+  border-radius: 1px;
+}
+.element-cell:hover {
+  transform: translateY(-3px) scale(1.06);
+  background: var(--bg-card-hover);
+  box-shadow: var(--shadow-lg);
+  z-index: 2;
+}
+.element-cell.is-selected {
+  background: var(--block-color);
+  color: var(--text-inverse);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+.element-cell.is-selected::after { background: var(--text-inverse); }
+.element-cell.is-dimmed { opacity: 0.25; }
+
+.element-number {
+  position: absolute;
+  top: 3px;
+  left: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+.element-symbol {
+  font-size: clamp(1.1rem, 1.9vw, 1.7rem);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.01em;
+}
+.element-name {
+  margin-top: 2px;
+  font-size: 0.5rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+.element-mass {
+  font-family: var(--font-mono);
+  font-size: 0.5rem;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+.element-cell.is-selected .element-number,
+.element-cell.is-selected .element-name,
+.element-cell.is-selected .element-mass { color: var(--text-inverse); }
+
+/* ─── Block Colours ──────────────────────────────────────── */
+.block-s { --block-color: var(--block-s); }
+.block-p { --block-color: var(--block-p); }
+.block-d { --block-color: var(--block-d); }
+.block-f { --block-color: var(--block-f); }
+
+.text-block-s { color: var(--block-s); }
+.text-block-p { color: var(--block-p); }
+.text-block-d { color: var(--block-d); }
+.text-block-f { color: var(--block-f); }
+
+.bg-block-s { background: var(--block-s-soft); }
+.bg-block-p { background: var(--block-p-soft); }
+.bg-block-d { background: var(--block-d-soft); }
+.bg-block-f { background: var(--block-f-soft); }
+
+/* ─── Legend / "Groups of elements" key ──────────────────── */
+.pt-legend {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 16px;
+  background: var(--bg-card);
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  font-family: var(--font-display);
+  box-shadow: var(--shadow-sm);
+}
+.pt-legend__title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-transform: none;
+}
+.pt-legend__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+.pt-legend__swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  background: var(--block-color);
+  flex-shrink: 0;
+}
+
+/* ─── Cards, Modal & Inputs (poster style) ───────────────── */
+.card {
+  background: var(--bg-card);
+  border: var(--cell-border-w) solid var(--cell-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow var(--transition-base), transform var(--transition-base);
+}
+.card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+
+.modal {
+  background: var(--bg-modal);
+  border: var(--cell-border-w) solid var(--cell-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl);
+  max-width: 640px;
+  width: 100%;
+  animation: scaleIn var(--transition-spring) both;
+}
+
+.btn-primary {
+  padding: 8px 18px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+  border: var(--cell-border-w) solid var(--cell-border);
+  border-radius: var(--radius-sm);
+  transition: background-color var(--transition-fast), transform var(--transition-fast);
+}
+.btn-primary:hover { background: var(--accent-hover); transform: translateY(-1px); }
+
+input[type='text'], input[type='search'] {
+  padding: 8px 12px;
+  background: var(--bg-input);
+  color: var(--text-primary);
+  border: 1.5px solid var(--border-medium);
+  border-radius: var(--radius-sm);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+input[type='text']:focus, input[type='search']:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
