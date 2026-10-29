@@ -4,7 +4,7 @@ import useLocalStorage from '../hooks/useLocalStorage';
 const ThemeContext = createContext(null);
 
 export function ThemeProvider({ children }) {
-  const [theme, setTheme] = useLocalStorage('periodicx-theme', 'dark');
+  const [theme, setTheme] = useLocalStorage('periodicx-theme', 'light');
 
   const toggleTheme = useCallback(() => {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
