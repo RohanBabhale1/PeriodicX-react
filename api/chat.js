@@ -456,13 +456,11 @@ export default async function handler(req, res) {
       console.error("[ChemBot] Groq error:", groqErr?.status, groqErr?.message);
       console.log("[ChemBot] Groq failed — trying Mistral fallback...");
     }
-          console.log("[ChemBot] Groq rate-limited — trying Mistral fallback...");
-        }
-      } else {
-        console.log(
-          "[ChemBot] Internal Groq quota exhausted — skipping to Mistral...",
-        );
-      }
+  } else {
+    console.log(
+      "[ChemBot] Internal Groq quota exhausted — skipping to Mistral...",
+    );
+  }
 
   // ── Mistral fallback ─────────────────────────────────────────────────────
   // Runs when: Groq returned 429 OR internal DAILY_EXHAUSTED/SESSION_CAP hit
