@@ -1,6 +1,7 @@
 // api/chat.js  — Vercel serverless function
 import Groq from "groq-sdk";
 import { createRequire } from "module";
+const GROQ_MODEL = process.env.GROQ_MODEL ?? "openai/gpt-oss-120b";
 
 const require = createRequire(import.meta.url);
 const ELEMENTS = require("../src/data/elements.json");
@@ -13,8 +14,8 @@ const QUOTA = {
   MAX_CONCURRENT_USERS: 5,
   SESSION_TOKEN_CAP: 20_000, // per-session hard cap (100K / 5 users)
   MESSAGE_COOLDOWN_MS: 3_000,
-  BASE_MAX_TOKENS: 300,
-  MIN_MAX_TOKENS: 60,
+  BASE_MAX_TOKENS: 800,
+  MIN_MAX_TOKENS: 300,
   HISTORY_LIMIT: 6,
 };
 
@@ -166,14 +167,16 @@ const PROPERTY_PATTERNS = {
   meltingPoint: {
     keywords: ["melting point", "melt", "highest melting"],
     sort: (a, b) => {
-      const av = parseFloat(a.meltingPoint), bv = parseFloat(b.meltingPoint);
+      const av = parseFloat(a.meltingPoint),
+        bv = parseFloat(b.meltingPoint);
       return (isNaN(bv) ? -Infinity : bv) - (isNaN(av) ? -Infinity : av);
     },
   },
   boilingPoint: {
     keywords: ["boiling point", "boil"],
     sort: (a, b) => {
-      const av = parseFloat(a.boilingPoint), bv = parseFloat(b.boilingPoint);
+      const av = parseFloat(a.boilingPoint),
+        bv = parseFloat(b.boilingPoint);
       return (isNaN(bv) ? -Infinity : bv) - (isNaN(av) ? -Infinity : av);
     },
   },
@@ -193,16 +196,22 @@ function resolveRelevantElements(message) {
   // Match by atomic number
   const numMatch = lower.match(/atomic number\s*(\d+)/i);
   if (numMatch) {
-    const found = ELEMENTS.find((e) => e.atomicNumber === parseInt(numMatch[1]));
+    const found = ELEMENTS.find(
+      (e) => e.atomicNumber === parseInt(numMatch[1]),
+    );
     if (found) return [found];
   }
 
   // Match by period and group
-  const pgMatch = lower.match(/period\s*(\d+).*group\s*(\d+)|group\s*(\d+).*period\s*(\d+)/i);
+  const pgMatch = lower.match(
+    /period\s*(\d+).*group\s*(\d+)|group\s*(\d+).*period\s*(\d+)/i,
+  );
   if (pgMatch) {
     const period = parseInt(pgMatch[1] ?? pgMatch[4]);
     const group = parseInt(pgMatch[2] ?? pgMatch[3]);
-    const found = ELEMENTS.filter((e) => e.period === period && e.group === group);
+    const found = ELEMENTS.filter(
+      (e) => e.period === period && e.group === group,
+    );
     if (found.length) return found;
   }
 
@@ -234,13 +243,27 @@ function formatElementData(elements) {
     .map((el) => {
       const lines = [`${el.name} (${el.symbol}, #${el.atomicNumber})`];
       [
-        "category", "period", "group", "block", "atomicMass",
-        "electronegativity", "density", "meltingPoint", "boilingPoint",
-        "stateAtRoomTemp", "electronConfiguration", "discoveredBy",
-        "discoveryYear", "uses",
+        "category",
+        "period",
+        "group",
+        "block",
+        "atomicMass",
+        "electronegativity",
+        "density",
+        "meltingPoint",
+        "boilingPoint",
+        "stateAtRoomTemp",
+        "electronConfiguration",
+        "discoveredBy",
+        "discoveryYear",
+        "uses",
       ].forEach((prop) => {
         const val = el[prop];
-        if (val != null && val !== "" && !(Array.isArray(val) && val.length === 0))
+        if (
+          val != null &&
+          val !== "" &&
+          !(Array.isArray(val) && val.length === 0)
+        )
           lines.push(`  ${prop}: ${Array.isArray(val) ? val.join(", ") : val}`);
       });
       return lines.join("\n");
@@ -275,14 +298,16 @@ function parseGroqRateLimitError(err) {
   const limit = toInt(/Limit\s+([\d,]+)/i);
   const used = toInt(/Used\s+([\d,]+)/i);
   const requested = toInt(/Requested\s+([\d,]+)/i);
-  const remaining = limit != null && used != null ? Math.max(0, limit - used) : null;
+  const remaining =
+    limit != null && used != null ? Math.max(0, limit - used) : null;
 
   const waitMatch = raw.match(/try again in\s+([^\.\n,]+)/i);
   const waitRaw = waitMatch ? waitMatch[1].trim() : null;
 
   function formatWait(str) {
     if (!str) return null;
-    const m = str.match(/(\d+)m/), s = str.match(/([\d.]+)s/);
+    const m = str.match(/(\d+)m/),
+      s = str.match(/([\d.]+)s/);
     const mins = m ? parseInt(m[1]) : 0;
     const secs = s ? Math.ceil(parseFloat(s[1])) : 0;
     if (mins > 0 && secs > 0) return `${mins} min ${secs} sec`;
@@ -293,16 +318,23 @@ function parseGroqRateLimitError(err) {
 
   function getRetryTime(str) {
     if (!str) return null;
-    const m = str.match(/(\d+)m/), s = str.match(/([\d.]+)s/);
-    const totalMs = ((m ? parseInt(m[1]) : 0) * 60 + (s ? parseFloat(s[1]) : 0)) * 1000;
+    const m = str.match(/(\d+)m/),
+      s = str.match(/([\d.]+)s/);
+    const totalMs =
+      ((m ? parseInt(m[1]) : 0) * 60 + (s ? parseFloat(s[1]) : 0)) * 1000;
     return new Date(Date.now() + totalMs).toLocaleTimeString([], {
-      hour: "2-digit", minute: "2-digit", second: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
     });
   }
 
   return {
     type: isDaily ? "daily" : isMinute ? "per_minute" : "unknown",
-    limit, used, remaining, requested,
+    limit,
+    used,
+    remaining,
+    requested,
     waitFormatted: formatWait(waitRaw),
     retryAt: getRetryTime(waitRaw),
   };
@@ -330,7 +362,9 @@ async function callMistral(messages, maxTokens) {
 
   if (!response.ok) {
     const errBody = await response.json().catch(() => ({}));
-    const err = new Error(errBody?.message ?? `Mistral error ${response.status}`);
+    const err = new Error(
+      errBody?.message ?? `Mistral error ${response.status}`,
+    );
     err.status = response.status;
     throw err;
   }
@@ -361,7 +395,11 @@ export default async function handler(req, res) {
   const limitResult = limiter.check(sessionId);
 
   // COOLDOWN and USER/GLOBAL RPM limits → block immediately, no fallback needed
-  const hardBlock = limitResult && ["COOLDOWN", "USER_RATE_LIMIT", "GLOBAL_RATE_LIMIT"].includes(limitResult.code);
+  const hardBlock =
+    limitResult &&
+    ["COOLDOWN", "USER_RATE_LIMIT", "GLOBAL_RATE_LIMIT"].includes(
+      limitResult.code,
+    );
   if (hardBlock) {
     return res.status(429).json({
       error: limitResult.message,
@@ -371,7 +409,9 @@ export default async function handler(req, res) {
   }
 
   // DAILY_EXHAUSTED or SESSION_CAP → Groq quota is gone, skip straight to Mistral
-  const groqExhausted = limitResult && ["DAILY_EXHAUSTED", "SESSION_CAP"].includes(limitResult.code);
+  const groqExhausted =
+    limitResult &&
+    ["DAILY_EXHAUSTED", "SESSION_CAP"].includes(limitResult.code);
 
   const maxTokens = limiter.getDynamicMaxTokens();
   const relevantElements = resolveRelevantElements(message.trim());
@@ -390,19 +430,20 @@ export default async function handler(req, res) {
     { role: "user", content: message.trim() },
   ];
 
-
   // ── Try Groq first (unless internal quota already exhausted) ─────────────
   if (!groqExhausted) {
     try {
       const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
       const completion = await groq.chat.completions.create({
-        model: "llama-3.3-70b-versatile",
+        model: GROQ_MODEL,
         messages,
         temperature: 0.1,
         max_tokens: maxTokens,
       });
 
-      const reply = completion.choices[0]?.message?.content?.trim() ?? "No response received.";
+      const reply =
+        completion.choices[0]?.message?.content?.trim() ??
+        "No response received.";
       const tokensUsed = completion.usage?.total_tokens ?? 400;
       limiter.record(sessionId, tokensUsed);
 
@@ -413,20 +454,15 @@ export default async function handler(req, res) {
       });
     } catch (groqErr) {
       console.error("[ChemBot] Groq error:", groqErr?.status, groqErr?.message);
-
-      // Non-rate-limit Groq error → fail immediately, no Mistral fallback
-      if (groqErr?.status !== 429) {
-        return res.status(500).json({
-          error: "Something went wrong. Please try again.",
-          code: "SERVER_ERROR",
-        });
-      }
-
-      console.log("[ChemBot] Groq rate-limited — trying Mistral fallback...");
+      console.log("[ChemBot] Groq failed — trying Mistral fallback...");
     }
-  } else {
-    console.log("[ChemBot] Internal Groq quota exhausted — skipping to Mistral...");
-  }
+          console.log("[ChemBot] Groq rate-limited — trying Mistral fallback...");
+        }
+      } else {
+        console.log(
+          "[ChemBot] Internal Groq quota exhausted — skipping to Mistral...",
+        );
+      }
 
   // ── Mistral fallback ─────────────────────────────────────────────────────
   // Runs when: Groq returned 429 OR internal DAILY_EXHAUSTED/SESSION_CAP hit
@@ -440,7 +476,8 @@ export default async function handler(req, res) {
   } catch (mistralErr) {
     console.error("[ChemBot] Mistral fallback failed:", mistralErr?.message);
     return res.status(429).json({
-      error: "All AI providers are currently unavailable. Please try again later.",
+      error:
+        "All AI providers are currently unavailable. Please try again later.",
       code: "ALL_PROVIDERS_EXHAUSTED",
     });
   }
